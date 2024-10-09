@@ -30,9 +30,10 @@ from networkx import (
     all_simple_paths,
     lowest_common_ancestor,
     random_layout,
+    # spring_layout,
     draw_networkx_nodes,
     draw_networkx_edges
-
+    # draw_networkx
 )
 import matplotlib
 import matplotlib.pyplot as plt
@@ -76,7 +77,7 @@ def get_arguments():  # pragma: no cover
     """
     # Parsing arguments
     parser = argparse.ArgumentParser(
-        description=__doc__, usage="{0} -h".format(sys.argv[0])
+        description=__doc__, usage=f"{sys.argv[0]} -h"
     )
     parser.add_argument(
         "-i", dest="fastq_file", type=isfile, required=True, help="Fastq file"
@@ -108,7 +109,7 @@ def read_fastq(fastq_file: Path) -> Iterator[str]:
     :param fastq_file: (Path) Path to the fastq file.
     :return: A generator object that iterate the read sequences.
     """
-    with open(fastq_file, "r") as f:
+    with open(fastq_file, "r", encoding="utf-8") as f:
         while True:
             f.readline()  # Ignorer l'identifiant
             sequence = f.readline().strip()  # Lire la séquence
@@ -211,7 +212,7 @@ def save_contigs(contigs_list: List[str], output_file: Path) -> None:
     :param contig_list: (list) List of [contiguous sequence and their length]
     :param output_file: (Path) Path to the output file
     """
-    with open(output_file, 'w') as f:
+    with open(output_file, 'w', encoding="utf-8") as f:
         for i, (contig, length) in enumerate(contigs_list):
             # Writes the FASTA header
             f.write(f">contig_{i} len={length}\n")
@@ -242,11 +243,11 @@ def remove_paths(
     new_graph = graph.copy()
 
     for path in path_list:
-        if delete_entry_node == True and delete_sink_node == True:
+        if delete_entry_node and delete_sink_node:
             new_graph.remove_nodes_from(path)
-        elif delete_entry_node == True and delete_sink_node == False:
+        elif delete_entry_node and not delete_sink_node:
             new_graph.remove_nodes_from(path[:-1])
-        elif delete_entry_node == False and delete_sink_node == True:
+        elif not delete_entry_node and delete_sink_node:
             new_graph.remove_nodes_from(path[1:])
         else:
             new_graph.remove_nodes_from(path[1:-1])
@@ -366,13 +367,23 @@ def solve_entry_tips(graph: DiGraph, starting_nodes: List[str]) -> DiGraph:
     :param starting_nodes: (list) A list of starting nodes
     :return: (DiGraph) A directed graph object
     """
-    path_list = [list(all_simple_paths(graph, start, node)) for node in graph.nodes for start in starting_nodes if len(list(graph.predecessors(node))) > 1]
-    
+    path_list = [
+    list(all_simple_paths(graph, start, node))
+    for node in graph.nodes
+    for start in starting_nodes
+    if len(list(graph.predecessors(node))) > 1]
+
     if path_list:
         path_length = [len(path) for paths in path_list for path in paths]
         weight_avg = [path_average_weight(graph, path) for paths in path_list for path in paths]
-        graph = select_best_path(graph, [path for paths in path_list for path in paths], path_length, weight_avg, delete_entry_node=True, delete_sink_node=False)
-    
+        graph = select_best_path(
+        graph,
+        [path for paths in path_list for path in paths],
+        path_length,
+        weight_avg,
+        delete_entry_node=True,
+        delete_sink_node=False)
+
     return graph
 
 
@@ -383,13 +394,23 @@ def solve_out_tips(graph: DiGraph, ending_nodes: List[str]) -> DiGraph:
     :param ending_nodes: (list) A list of ending nodes
     :return: (DiGraph) A directed graph object
     """
-    path_list = [list(all_simple_paths(graph, node, end)) for node in graph.nodes for end in ending_nodes if len(list(graph.successors(node))) > 1]
-    
+    path_list = [
+    list(all_simple_paths(graph, node, end))
+    for node in graph.nodes
+    for end in ending_nodes
+    if len(list(graph.successors(node))) > 1]
+
     if path_list:
         path_length = [len(path) for paths in path_list for path in paths]
         weight_avg = [path_average_weight(graph, path) for paths in path_list for path in paths]
-        graph = select_best_path(graph, [path for paths in path_list for path in paths], path_length, weight_avg, delete_entry_node=False, delete_sink_node=True)
-    
+        graph = select_best_path(
+        graph,
+        [path for paths in path_list for path in paths],
+        path_length,
+        weight_avg,
+        delete_entry_node=False,
+        delete_sink_node=True)
+
     return graph
 
 
@@ -399,22 +420,29 @@ def draw_graph(graph: DiGraph, graphimg_file: Path) -> None:  # pragma: no cover
     :param graph: (DiGraph) A directed graph object
     :param graphimg_file: (Path) Path to the output file
     """
-    # fig, ax = plt.subplots()
+    fig, ax = plt.subplots()
     elarge = [(u, v) for (u, v, d) in graph.edges(data=True) if d["weight"] > 3]
-    # print(elarge)
     esmall = [(u, v) for (u, v, d) in graph.edges(data=True) if d["weight"] <= 3]
-    # print(elarge)
+
     # Draw the graph with networkx
-    # pos=nx.spring_layout(graph)
+    # pos = spring_layout(graph)
     pos = random_layout(graph)
     draw_networkx_nodes(graph, pos, node_size=6)
     draw_networkx_edges(graph, pos, edgelist=elarge, width=6)
     draw_networkx_edges(
-        graph, pos, edgelist=esmall, width=6, alpha=0.5, edge_color="b", style="dashed"
+        graph,
+        pos,
+        edgelist=esmall,
+        width=6,
+        alpha=0.5,
+        edge_color="b",
+        style="dashed",
+        ax=ax,
     )
-    # nx.draw_networkx(graph, pos, node_size=10, with_labels=False)
-    # save image
-    plt.savefig(graphimg_file.resolve())
+    # draw_networkx(graph, pos, node_size=10, with_labels=False)
+
+    # Save image
+    fig.savefig(graphimg_file.resolve())
 
 
 # ==============================================================
@@ -426,16 +454,48 @@ def main() -> None:  # pragma: no cover
     """
     Main program function
     """
-    # Get arguments
+   # Step 1: Retrieve arguments and set up variables
     args = get_arguments()
+    fastq_file = args.fastq_file
+    kmer_size = args.kmer_size
+    output_file = args.output_file
+    graphimg_file = args.graphimg_file
 
-    # Fonctions de dessin du graphe
-    # A decommenter si vous souhaitez visualiser un petit
-    # graphe
-    # Plot the graph
-    # if args.graphimg_file:
-    #     draw_graph(graph, args.graphimg_file)
+    # Step 2: Build the k-mer dictionary from the input FASTQ file
+    print("Building k-mer dictionary...")
+    kmer_dict = build_kmer_dict(fastq_file, kmer_size)
 
+    # Step 3: Build the De Bruijn graph from the k-mer dictionary
+    print("Constructing De Bruijn graph...")
+    graph = build_graph(kmer_dict)
+
+    # Step 4: Simplify the graph by resolving bubbles
+    print("Resolving bubbles...")
+    graph = simplify_bubbles(graph)
+
+    # Step 5: Further simplify the graph by removing entry and exit tips
+    print("Removing entry tips...")
+    starting_nodes = get_starting_nodes(graph)
+    graph = solve_entry_tips(graph, starting_nodes)
+
+    print("Removing exit tips...")
+    ending_nodes = get_sink_nodes(graph)
+    graph = solve_out_tips(graph, ending_nodes)
+
+    # Step 6: Extract contigs from the simplified graph
+    print("Extracting contigs...")
+    contigs = get_contigs(graph, starting_nodes, ending_nodes)
+
+    # Step 7: Save the contigs to the output file
+    print("Saving contigs to output file...")
+    save_contigs(contigs, output_file)
+
+    # Step 8: Optional - Save a visual representation of the graph if specified
+    if graphimg_file:
+        print("Saving graph image...")
+        draw_graph(graph, graphimg_file)
+
+    print("Assembly complete. Contigs saved to:", output_file)
 
 if __name__ == "__main__":  # pragma: no cover
     main()
