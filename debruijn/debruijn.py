@@ -35,6 +35,8 @@ import statistics
 import textwrap
 import matplotlib.pyplot as plt
 from typing import Iterator, Dict, List
+from statistics import stdev
+from itertools import combinations
 
 random.seed(9001)
 
@@ -174,6 +176,7 @@ def get_starting_nodes(graph: DiGraph) -> List[str]:
     """
     return [node for node in graph.nodes if graph.in_degree(node) == 0]
 
+
 def get_sink_nodes(graph: DiGraph) -> List[str]:
     """Get nodes without successors
 
@@ -212,10 +215,16 @@ def save_contigs(contigs_list: List[str], output_file: Path) -> None:
     """
     with open(output_file, 'w') as f:
         for i, (contig, length) in enumerate(contigs_list):
-            # ÉWrites the FASTA header
+            # Writes the FASTA header
             f.write(f">contig_{i} len={length}\n")
             # Uses textwrap.fill to cut the contig lines to fit only 80 characters
             f.write(textwrap.fill(contig, width=80) + "\n")
+
+
+############################################################
+########## Simplification du graphe de Bruijn ##############
+############################################################
+
 
 def remove_paths(
     graph: DiGraph,
@@ -232,7 +241,23 @@ def remove_paths(
     :param delete_sink_node: (boolean) True->We remove the last node of a path
     :return: (nx.DiGraph) A directed graph object
     """
-    pass
+    new_graph = graph.copy()
+    
+    for path in path_list:
+    
+        if delete_entry_node == True and delete_sink_node == True:
+            new_graph.remove_nodes_from(path)
+            
+        elif delete_entry_node == True and delete_sink_node == False:
+            new_graph.remove_nodes_from(path[:-1])
+            
+        elif delete_entry_node == False and delete_sink_node == True:
+            new_graph.remove_nodes_from(path[1:])
+        
+        else:
+            new_graph.remove_nodes_from(path[1:-1])
+                    
+    return new_graph 
 
 
 def select_best_path(
@@ -253,19 +278,25 @@ def select_best_path(
     :param delete_sink_node: (boolean) True->We remove the last node of a path
     :return: (nx.DiGraph) A directed graph object
     """
-    pass
-
-
-def path_average_weight(graph: DiGraph, path: List[str]) -> float:
-    """Compute the weight of a path
-
-    :param graph: (nx.DiGraph) A directed graph object
-    :param path: (list) A path consist of a list of nodes
-    :return: (float) The average weight of a path
-    """
-    return statistics.mean(
-        [d["weight"] for (u, v, d) in graph.subgraph(path).edges(data=True)]
-    )
+    std_poids = statistics.stdev(weight_avg_list) # calcul écart-type sur les poids 
+    std_long = statistics.stdev(path_length) # calcul écart-type sur les longueurs 
+    
+    if std_poids > 0:
+        best_path_index = weight_avg_list.index(max(weight_avg_list))  
+        
+    else:
+        if std_long > 0:
+            best_path_index = path_length.index(max(path_length))
+        else:
+           best_path_index = random.randint(0, len(path_list)-1)
+        
+    best_path = path_list[best_path_index]
+    
+    for path in path_list:
+        if path != best_path:
+            graph = remove_paths(graph, [path], delete_entry_node, delete_sink_node)
+    
+    return graph
 
 
 def solve_bubble(graph: DiGraph, ancestor_node: str, descendant_node: str) -> DiGraph:
@@ -276,7 +307,17 @@ def solve_bubble(graph: DiGraph, ancestor_node: str, descendant_node: str) -> Di
     :param descendant_node: (str) A downstream node in the graph
     :return: (nx.DiGraph) A directed graph object
     """
-    pass
+    paths = list(all_simple_paths(graph, ancestor_node, descendant_node))
+    path_lengths = []
+    path_weights = []
+    
+    for path in paths:
+        path_lengths.append(len(path))
+        path_weights.append(path_average_weight(graph, path))
+
+    graph = select_best_path(graph, paths, path_lengths, path_weights, delete_entry_node=False, delete_sink_node=False)
+    
+    return graph
 
 
 def simplify_bubbles(graph: DiGraph) -> DiGraph:
@@ -285,7 +326,34 @@ def simplify_bubbles(graph: DiGraph) -> DiGraph:
     :param graph: (nx.DiGraph) A directed graph object
     :return: (nx.DiGraph) A directed graph object
     """
-    pass
+    bubble = False
+    list_nodes_graph = list(graph.nodes())
+
+    for node in list_nodes_graph:
+        list_predecessors = list(graph.predecessors(node))
+        if len(list_predecessors) > 1:
+            for pred1, pred2 in combinations(list_predecessors, 2):
+                noeud_ancetre = lowest_common_ancestor(graph, pred1, pred2)
+                if noeud_ancetre is not None:
+                    bubble = True
+                    graph = solve_bubble(graph, noeud_ancetre, node)
+                    break
+            if bubble:
+                break
+    if bubble:
+        graph = simplify_bubbles(graph)
+    return graph
+
+
+def path_average_weight(graph: DiGraph, path: List[str]) -> float:
+    """Compute the weight of a path
+
+    :param graph: (nx.DiGraph) A directed graph object
+    :param path: (list) A path consist of a list of nodes
+    :return: (float) The average weight of a path
+    """
+    total_weight = sum(graph[u][v]['weight'] for u, v in zip(path[:-1], path[1:]))
+    return total_weight / (len(path) - 1)
 
 
 def solve_entry_tips(graph: DiGraph, starting_nodes: List[str]) -> DiGraph:
