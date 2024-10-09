@@ -142,13 +142,23 @@ def build_kmer_dict(fastq_file: Path, kmer_size: int) -> Dict[str, int]:
     return kmer_dict
 
 
+############################################################
+############ Construction de l'arbre de Bruijn #############
+############################################################
+
+
 def build_graph(kmer_dict: Dict[str, int]) -> DiGraph:
     """Build the debruijn graph
 
     :param kmer_dict: A dictionnary object that identify all kmer occurrences.
     :return: A directed graph (nx) of all kmer substring and weight (occurrence).
     """
-    pass
+    graph = DiGraph()
+    for kmer, count in kmer_dict.items():
+        prefix = kmer[:-1]
+        suffix = kmer[1:]
+        graph.add_edge(prefix, suffix, weight=count)
+    return graph
 
 
 def remove_paths(
