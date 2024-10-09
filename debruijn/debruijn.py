@@ -161,6 +161,62 @@ def build_graph(kmer_dict: Dict[str, int]) -> DiGraph:
     return graph
 
 
+############################################################
+############ Parcours du graphe de Bruijn ##################
+############################################################
+
+
+def get_starting_nodes(graph: DiGraph) -> List[str]:
+    """Get nodes without predecessors
+
+    :param graph: (nx.DiGraph) A directed graph object
+    :return: (list) A list of all nodes without predecessors
+    """
+    return [node for node in graph.nodes if graph.in_degree(node) == 0]
+
+def get_sink_nodes(graph: DiGraph) -> List[str]:
+    """Get nodes without successors
+
+    :param graph: (nx.DiGraph) A directed graph object
+    :return: (list) A list of all nodes without successors
+    """
+    return [node for node in graph.nodes if graph.out_degree(node) == 0]
+
+
+def get_contigs(
+    graph: DiGraph, starting_nodes: List[str], ending_nodes: List[str]
+) -> List:
+    """Extract the contigs from the graph
+
+    :param graph: (nx.DiGraph) A directed graph object
+    :param starting_nodes: (list) A list of nodes without predecessors
+    :param ending_nodes: (list) A list of nodes without successors
+    :return: (list) List of [contiguous sequence and their length]
+    """
+    contigs = []
+    for start in starting_nodes:
+        for end in ending_nodes:
+            for path in all_simple_paths(graph, start, end):
+                contig = path[0]
+                for node in path[1:]:
+                    contig += node[-1]  # Ajoute uniquement le dernier caractère du k-mer
+                contigs.append((contig, len(contig)))
+    return contigs
+
+
+def save_contigs(contigs_list: List[str], output_file: Path) -> None:
+    """Write all contigs in fasta format
+
+    :param contig_list: (list) List of [contiguous sequence and their length]
+    :param output_file: (Path) Path to the output file
+    """
+    with open(output_file, 'w') as f:
+        for i, (contig, length) in enumerate(contigs_list):
+            # ÉWrites the FASTA header
+            f.write(f">contig_{i} len={length}\n")
+            # Uses textwrap.fill to cut the contig lines to fit only 80 characters
+            f.write(textwrap.fill(contig, width=80) + "\n")
+
 def remove_paths(
     graph: DiGraph,
     path_list: List[List[str]],
@@ -248,46 +304,6 @@ def solve_out_tips(graph: DiGraph, ending_nodes: List[str]) -> DiGraph:
     :param graph: (nx.DiGraph) A directed graph object
     :param ending_nodes: (list) A list of ending nodes
     :return: (nx.DiGraph) A directed graph object
-    """
-    pass
-
-
-def get_starting_nodes(graph: DiGraph) -> List[str]:
-    """Get nodes without predecessors
-
-    :param graph: (nx.DiGraph) A directed graph object
-    :return: (list) A list of all nodes without predecessors
-    """
-    pass
-
-
-def get_sink_nodes(graph: DiGraph) -> List[str]:
-    """Get nodes without successors
-
-    :param graph: (nx.DiGraph) A directed graph object
-    :return: (list) A list of all nodes without successors
-    """
-    pass
-
-
-def get_contigs(
-    graph: DiGraph, starting_nodes: List[str], ending_nodes: List[str]
-) -> List:
-    """Extract the contigs from the graph
-
-    :param graph: (nx.DiGraph) A directed graph object
-    :param starting_nodes: (list) A list of nodes without predecessors
-    :param ending_nodes: (list) A list of nodes without successors
-    :return: (list) List of [contiguous sequence and their length]
-    """
-    pass
-
-
-def save_contigs(contigs_list: List[str], output_file: Path) -> None:
-    """Write all contigs in fasta format
-
-    :param contig_list: (list) List of [contiguous sequence and their length]
-    :param output_file: (Path) Path to the output file
     """
     pass
 
